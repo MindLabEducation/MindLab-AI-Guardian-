@@ -1,0 +1,115 @@
+import tkinter as tk
+from tkinter import Text, Label, Button, messagebox
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+import nltk
+import requests
+
+# Download NLTK data
+nltk.download('stopwords')
+nltk.download('punkt')
+
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+
+# Function to clean the text
+def clean_text(text):
+    stop_words = set(stopwords.words('english'))
+    words = word_tokenize(text)
+    cleaned_words = [word.lower() for word in words if word.isalpha() and word.lower() not in stop_words]
+    return ' '.join(cleaned_words)
+
+# Function to check spam
+def check_spam():
+    input_text = text_entry.get("1.0",'end-1c')
+    cleaned_text = clean_text(input_text)
+    vectorized_text = vectorizer.transform([cleaned_text])
+    prediction = classifier.predict(vectorized_text)[0]
+
+    result_label.config(text=f"Result: {prediction}")
+
+    if prediction == 'spam':
+        messagebox.showwarning("Warning", "This message may be spam!")
+    else:
+        messagebox.showinfo("Info", "This message is not spam.")
+
+
+def search_yelp_reviews(api_key, query):
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+    url = "https://api.yelp.com/v3/businesses/search"
+    params = {
+        "term": query,
+        "limit": 5
+    }
+
+    response = requests.get(url, headers = headers, params = params)
+    data = response.json()
+
+    reviews = []
+
+    for business in data.get("businesses", []):
+        reviews.append(business.get("name", "N/A"))
+
+    return reviews
+
+def check_reviews():
+    sender_email = review_entry.get()
+    if not sender_email:
+        messagebox.showwarning("Warning", "Please enter the sender's email for review!")
+        return
+    search_results = search_yelp_reviews(yelp_api_key, sender_email)
+
+    messagebox.showinfo("Yelp Reviews", f"Yelp Reviews for {sender_email}: \n{','.join(search_results)}")
+
+# Create the GUI
+app = tk.Tk()
+app.title("Spam Detector")
+
+# Sample data
+X = ["Get a free iPhone now!", "Meeting at 10 AM tomorrow", "Hello!", "Give me your bank acount!", "Tell me your Adress", "Your time ending", "Let's go for a coffee", "Hi"]
+y = ["spam", "not spam", "not spam", "spam", "spam", "spam", "not spam", "not spam"]
+
+X = [clean_text(text) for text in X]
+
+# Create a CountVectorizer
+vectorizer = CountVectorizer()
+X_vectorized = vectorizer.fit_transform(X)
+
+# Train the Naive Bayes classifier
+classifier = MultinomialNB()
+classifier.fit(X_vectorized, y)
+
+# Text label
+text_label = Label(app, text="Enter the text:")
+text_label.pack()
+
+# Text widget for text input
+text_entry = Text(app, height=5, width=50)
+text_entry.pack()
+
+# Check button
+check_button = Button(app, text="Check Spam", command=check_spam)
+check_button.pack()
+
+# Result label
+result_label = Label(app, text="")
+result_label.pack()
+
+separator  =  tk.Frame(height = 2, bd = 1, relief = tk.SUNKEN)
+separator.pack(fill = tk.X, padx = 5, pady = 5)
+
+
+review_label = Label(app, text = "Enter the email for Reviews Check:")
+review_label.pack()
+
+review_entry = Text(app, height=1, width=30)
+review_entry.pack()
+
+review_button = Button(app, text="Check Yelp Reviews", command=check_reviews)
+review_button.pack()
+
+
+# Start the GUI
+app.mainloop()
